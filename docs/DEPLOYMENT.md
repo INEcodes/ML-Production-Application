@@ -24,7 +24,7 @@ image doesn't change which model version is served.
 | **Namespace** | Profile menu → Tenancy → *Object storage namespace* | Used in the S3 endpoint and the OCIR image path. |
 | **S3 keys** | Profile → My profile → *Customer secret keys* → Generate | Gives the access key + secret for `OCI_S3_*`. The secret is shown **once**. |
 | **Auth token** | Profile → My profile → *Auth tokens* → Generate | The password for `docker login` to OCIR, both in CI and on the VM. |
-| **VM** | Compute → Instances → Create | Image **Canonical Ubuntu 24.04**. Preferred shape: **VM.Standard.A1.Flex** (arm64), e.g. 2 OCPU / 12 GB. If you get "out of capacity", retry later or try another availability domain. **VM.Standard.E2.1.Micro** (amd64, 1 OCPU / 1 GB) also works for **one** model: set `COMPOSE_PROFILES=cnn`. `setup.sh` adds 2 GB of swap on small-RAM machines. Assign a public IPv4 and save the SSH key pair. |
+| **VM** | Compute → Instances → Create | Image **Oracle Linux 8/9** (the default; user `opc`) or **Canonical Ubuntu 24.04** (user `ubuntu`); `setup.sh` handles both. The commands below use `ubuntu@`, so substitute `opc@` on Oracle Linux. Preferred shape: **VM.Standard.A1.Flex** (arm64), e.g. 2 OCPU / 12 GB. If you get "out of capacity", retry later or try another availability domain. **VM.Standard.E2.1.Micro** (amd64, 1 OCPU / 1 GB) also works for **one** model: set `COMPOSE_PROFILES=cnn`. `setup.sh` adds 2 GB of swap on small-RAM machines. Assign a public IPv4 and save the SSH key pair. |
 | **Ingress** | VCN → the subnet's Security List → Add ingress rules | TCP 80 and 443 from `0.0.0.0/0`. Restrict TCP 22 to your IP. |
 | **DNS** *(optional)* | Your DNS provider | An A record pointing at the VM's IP. No domain? `<ip-with-dashes>.sslip.io` works with Let's Encrypt. |
 
@@ -60,9 +60,11 @@ cp ~/.env.example /opt/ml-app/.env && chmod 600 /opt/ml-app/.env && nano /opt/ml
 docker login <region>.ocir.io -u '<namespace>/<username>'    # password: the auth token
 ```
 
-`setup.sh` installs Docker and the Compose plugin, nginx and certbot. It opens 80/443 in
-the host's iptables (OCI's Ubuntu images block them by default, separately from the
-Security List). It also installs the `ml-app` systemd unit and the nginx site, and gets a
+`setup.sh` installs Docker and the Compose plugin, nginx and certbot. On Oracle Linux
+it pulls certbot from EPEL and removes the preinstalled podman/buildah/runc, which
+conflict with Docker. It opens 80/443 on the host, separately from the Security List:
+iptables on Ubuntu, firewalld on Oracle Linux. On Oracle Linux it also allows nginx
+to proxy through SELinux. It also installs the `ml-app` systemd unit and the nginx site, and gets a
 TLS certificate if `DOMAIN` and `EMAIL` are set. It is safe to re-run.
 
 In `/opt/ml-app/.env`, set `IMAGE`, the `OCI_*` values and `COMPOSE_PROFILES`. **Only list
