@@ -1,0 +1,22 @@
+seed: 42
+
+data:
+  root: training/data
+  max_seq_len: 64
+  min_freq: 2
+  max_vocab_size: 20000
+
+model:
+  embedding_dim: 128
+  hidden_dim: 256
+  num_layers: 1
+  num_classes: 4
+  bidirectional: false
+  dropout: 0.0
+
+train:
+  batch_size: 64
+  epochs: 10
+  lr: 0.001
+  val_split: 0.1
+  early_stop_patience: 3

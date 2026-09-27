@@ -1,0 +1,19 @@
+# Installed by scripts/vm/setup.sh as /etc/systemd/system/ml-app.service.
+# Brings the compose stack up on boot (containers also have restart: unless-stopped).
+[Unit]
+Description=ML serving stack (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+ConditionPathExists=__APP_DIR__/.env
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=__APP_DIR__
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

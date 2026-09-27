@@ -1,0 +1,18 @@
+# Tooling config only - training/ and serving/ keep their own requirements.txt.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["training/data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "training"]
+
+[tool.pytest.ini_options]
+# serving/ on the path so tests import `app.*` exactly like the container does.
+pythonpath = [".", "serving"]
+testpaths = ["serving/tests", "tests"]
+filterwarnings = ["ignore::torch.jit.TracerWarning"]

@@ -1,0 +1,79 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ---- Virtual environments ----
+venv/
+.venv/
+env/
+ENV/
+
+# ---- Environment variables / secrets ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+service-account*.json
+gcp-key*.json
+
+# ---- Datasets (kept local / pulled via scripts, not committed) ----
+data/
+training/data/
+datasets/raw/
+*.csv
+*.parquet
+*.h5
+*.hdf5
+!**/sample_data/*.csv
+
+# ---- Trained model artifacts & checkpoints (pushed to object storage, not git) ----
+artifacts/
+checkpoints/
+/models/
+*.pt
+*.pth
+*.onnx
+*.ckpt
+*.safetensors
+
+# ---- Experiment tracking / logs ----
+mlruns/
+wandb/
+lightning_logs/
+runs/
+tensorboard/
+logs/
+*.log
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ---- Docker ----
+docker-compose.override.yml
+
+# ---- IDE ----
+.vscode/
+.idea/
+*.swp
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Testing / coverage ----
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ---- Misc archives ----
+*.tar.gz
+*.zip

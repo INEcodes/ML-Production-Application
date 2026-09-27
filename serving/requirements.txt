@@ -1,0 +1,10 @@
+# CPU-only torch wheels (x86_64 and aarch64): no CUDA in the serving image.
+--extra-index-url https://download.pytorch.org/whl/cpu
+# Must be >= the torch version that exported the model (see "torch_version" in metrics.json).
+torch>=2.2
+numpy>=1.26
+pillow>=10.0
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+boto3>=1.36

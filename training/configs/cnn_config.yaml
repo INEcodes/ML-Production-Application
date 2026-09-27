@@ -1,0 +1,23 @@
+seed: 42
+
+data:
+  root: training/data
+  num_workers: 2
+
+model:
+  in_channels: 3
+  num_classes: 10
+  conv_channels: [32, 64, 128]
+  fc_hidden: 256
+  dropout: 0.3
+
+train:
+  batch_size: 128
+  epochs: 20
+  lr: 0.001
+  val_split: 0.1
+  early_stop_patience: 5
+
+augmentation:
+  random_crop: true
+  random_flip: true

@@ -1,0 +1,113 @@
+name: ci
+
+# PRs: lint + tests.  Push to main: lint + tests -> build amd64+arm64 image -> push to OCIR
+# -> SSH deploy to the Always Free VM.  Build/deploy only run once the repository
+# variable DEPLOY_ENABLED is "true" (see docs/DEPLOYMENT.md for the secrets it needs).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ${{ secrets.OCIR_REGION }}.ocir.io/${{ secrets.OCIR_NAMESPACE }}/${{ vars.OCIR_REPO || 'ml-serving' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            serving/requirements*.txt
+
+      - name: Install deps (serving + what the export/serving contract test needs)
+        run: |
+          pip install -r serving/requirements.txt -r serving/requirements-dev.txt \
+            torchvision pyyaml
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Tests (serving API, model loader, export<->serving contract)
+        run: pytest -q
+
+  build-push:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      # Multi-arch by default so the same tag runs on Ampere A1 (arm64) and
+      # E2.1.Micro (amd64). Set repo variable IMAGE_PLATFORMS to build just one.
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to OCIR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.OCIR_REGION }}.ocir.io
+          # <tenancy-namespace>/<username>  (IDCS users: <namespace>/oracleidentitycloudservice/<email>)
+          username: ${{ secrets.OCIR_NAMESPACE }}/${{ secrets.OCIR_USERNAME }}
+          password: ${{ secrets.OCIR_AUTH_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: serving
+          platforms: ${{ vars.IMAGE_PLATFORMS || 'linux/amd64,linux/arm64' }}
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+  deploy:
+    needs: build-push
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write SSH key (+ pinned host key, if provided)
+        env:
+          VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+          VM_KNOWN_HOSTS: ${{ secrets.VM_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VM_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if [ -n "$VM_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$VM_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          fi
+
+      - name: Deploy
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          IMAGE_TAG: ${{ needs.build-push.outputs.tag }}
+        run: SSH_KEY_FILE="$HOME/.ssh/deploy_key" bash scripts/deploy.sh

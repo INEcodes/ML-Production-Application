@@ -1,0 +1,49 @@
+# Runs unchanged on the OCI VM (copied to /opt/ml-app by scripts/deploy.sh) and locally.
+# All settings come from a .env next to this file - see serving/.env.example.
+#
+# One image, two services: each container serves one model. Nginx on the host routes
+#   /cnn/ -> 127.0.0.1:8001   and   /rnn/ -> 127.0.0.1:8002
+# Which models run = COMPOSE_PROFILES in .env (e.g. "cnn,rnn", or just "cnn" until an
+# RNN version has been pushed - a service with no model to load would crash-loop).
+# Rollback a model = change CNN_MODEL_VERSION / RNN_MODEL_VERSION in .env and
+# `docker compose up -d`. Rollback the code = change IMAGE_TAG.
+
+name: ml-app
+
+x-serving: &serving
+  image: ${IMAGE:-ml-serving}:${IMAGE_TAG:-latest}
+  restart: unless-stopped
+  env_file:
+    - path: .env
+      required: false
+  volumes:
+    - model-cache:/var/cache/models
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  cnn:
+    <<: *serving
+    profiles: [cnn]
+    environment:
+      MODEL_NAME: cnn
+      MODEL_VERSION: ${CNN_MODEL_VERSION:-latest}
+      ROOT_PATH: /cnn
+    ports:
+      - "127.0.0.1:8001:8000"
+
+  rnn:
+    <<: *serving
+    profiles: [rnn]
+    environment:
+      MODEL_NAME: rnn
+      MODEL_VERSION: ${RNN_MODEL_VERSION:-latest}
+      ROOT_PATH: /rnn
+    ports:
+      - "127.0.0.1:8002:8000"
+
+volumes:
+  model-cache:
