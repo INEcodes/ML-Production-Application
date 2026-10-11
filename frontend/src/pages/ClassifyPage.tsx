@@ -237,7 +237,7 @@ function Classifier({ model }: { model: VersionResponse }) {
       </Card>
 
       {/* ---- result (black feature card) ---- */}
-      <Card tone="contrast" className="min-h-[24rem] lg:sticky lg:top-28 lg:col-span-5">
+      <Card tone="contrast" className="min-h-[24rem] lg:col-span-5">
         <SectionTitle onContrast hint="Step 2 · what the model thinks">
           Result
         </SectionTitle>
