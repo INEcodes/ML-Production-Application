@@ -85,15 +85,23 @@ https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable" \
 }
 
 install_el() {
-  echo "==> base packages (EPEL for certbot)"
-  dnf install -y -q dnf-plugins-core curl
+  if [ "$mem_kb" -lt 2000000 ]; then
+    # On 1 GB VMs the background metadata refresh plus our own dnf runs can exhaust
+    # memory and freeze the machine (sshd stops answering). Keep only one dnf at a time.
+    systemctl disable --now dnf-makecache.timer 2>/dev/null || true
+  fi
+  # No -q: dnf is slow on small VMs and silence looks like a hang.
+  DNF=(dnf install -y --setopt=install_weak_deps=False)
+
+  echo "==> base packages (EPEL for certbot) - can take several minutes on a 1 GB VM"
+  "${DNF[@]}" dnf-plugins-core curl
   if [ "${ID}" = "ol" ]; then
-    dnf install -y -q "oracle-epel-release-el${EL_MAJOR}"
+    "${DNF[@]}" "oracle-epel-release-el${EL_MAJOR}"
     dnf config-manager --set-enabled "ol${EL_MAJOR}_developer_EPEL" || true
   else
-    dnf install -y -q epel-release
+    "${DNF[@]}" epel-release
   fi
-  dnf install -y -q nginx certbot python3-certbot-nginx
+  "${DNF[@]}" nginx certbot python3-certbot-nginx
 
   echo "==> docker engine + compose plugin"
   if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
@@ -101,7 +109,7 @@ install_el() {
     # Some images ship a podman-docker shim as `docker`; remove it too.
     dnf remove -y -q podman podman-docker buildah runc 2>/dev/null || true
     dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-    dnf install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
+    "${DNF[@]}" docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
       docker-compose-plugin
   fi
 

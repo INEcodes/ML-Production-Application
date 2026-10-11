@@ -77,3 +77,6 @@ htmlcov/
 # ---- Misc archives ----
 *.tar.gz
 *.zip
+
+
+Oracle-SSH/
