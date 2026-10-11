@@ -81,5 +81,7 @@ htmlcov/
 
 Oracle-SSH/
 
-# ---- Vercel (frontend/ is linked to a Vercel project) ----
+# ---- Frontend (React/Vite, deployed by Vercel - never part of the VM image) ----
 .vercel/
+node_modules/
+frontend/dist/

@@ -55,6 +55,9 @@ serving/        # lightweight deps — never imports training/
   Dockerfile
   docker-compose.yml # what actually runs on the OCI VM (one service per model)
 tests/          # export<->serving contract test — the only code importing both sides
+frontend/       # React + Vite + TS + Tailwind UI, deployed by Vercel (NOT CI / NOT the VM)
+  api/[endpoint].js # Vercel function proxying /api/* to API_BASE_URL (no CORS on the VM)
+  src/types/api.ts  # mirrors serving/app/schemas.py — update when the API contract changes
 frontend/       # static page + Vercel function proxying to API_BASE_URL — deployed on
                 # Vercel, NOT on the Oracle VM; CI ignores this directory entirely
 docs/

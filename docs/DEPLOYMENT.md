@@ -121,12 +121,14 @@ Interactive docs: `https://<domain>/cnn/docs`.
 
 ## 5b. Frontend on Vercel (separate from the VM)
 
-The `frontend/` page doesn't run on the Oracle VM, and CI doesn't build or deploy it.
-`ci.yml` ignores `frontend/**`. Vercel deploys it from the same GitHub repo:
+The `frontend/` React app (Vite + TypeScript + Tailwind) doesn't run on the Oracle VM,
+and CI doesn't build or deploy it. `ci.yml` ignores `frontend/**`, and the serving image
+is built from `serving/` only. Vercel deploys it from the same GitHub repo:
 
 1. Go to vercel.com → **Add New → Project** → import `INEcodes/ML-Production-Application`.
-2. **Root Directory:** `frontend`. **Framework Preset:** Other. Leave the build and
-   output settings empty: it's a static page plus one function.
+2. **Root Directory:** `frontend`. **Framework Preset:** Vite. Leave the build and output
+   settings on their defaults: `frontend/vercel.json` sets `npm run build` → `dist/` and
+   the SPA fallback that serves `index.html` for `/history`, `/model` and `/about`.
 3. **Environment Variables:** `API_BASE_URL` = `https://<domain>/cnn`. Apply it to
    Production and Preview.
 4. Click **Deploy**. Afterwards every push redeploys it. To skip Vercel builds for
@@ -136,6 +138,16 @@ The `frontend/` page doesn't run on the Oracle VM, and CI doesn't build or deplo
 The browser only calls the page's own `/api/{health,version,predict}`. The function in
 `frontend/api/[endpoint].js` forwards those calls to `API_BASE_URL`, so the backend needs
 no CORS setup. Changing the backend URL means editing the Vercel env var and redeploying.
+
+Local development (Node 20.19+):
+
+```bash
+cd frontend
+cp .env.example .env        # API_BASE_URL=https://<domain>/cnn
+npm install
+npm run dev                 # http://localhost:5173; Vite proxies /api/* like the Vercel function
+npm run build               # typecheck + production build (what Vercel runs)
+```
 
 ## 6. Standing update procedure
 

@@ -4,8 +4,9 @@ name: ci
 # -> SSH deploy to the Always Free VM.  Build/deploy only run once the repository
 # variable DEPLOY_ENABLED is "true" (see docs/DEPLOYMENT.md for the secrets it needs).
 
-# Backend only: the frontend/ page is deployed separately by Vercel's Git integration,
-# so changes there (or to docs alone) never rebuild or redeploy the Oracle VM.
+# Backend only: the frontend/ React app is built and deployed by Vercel's Git integration,
+# so changes there (or to docs alone) never trigger this workflow. Even on a mixed commit
+# the image is built from serving/ only, so no frontend code ever reaches the Oracle VM.
 on:
   pull_request:
     paths-ignore:
