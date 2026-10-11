@@ -80,3 +80,6 @@ htmlcov/
 
 
 Oracle-SSH/
+
+# ---- Vercel (frontend/ is linked to a Vercel project) ----
+.vercel/

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image Classifier</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1d2330; --muted: #6b7280;
+    --border: #e3e6eb; --accent: #2f6fde; --bar: #dbe6fb; --ok: #1f8a4c; --err: #c0392b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --card: #1b1f27; --text: #e7eaf0; --muted: #9aa3b2;
+      --border: #2b313c; --accent: #6b9cf5; --bar: #263552; --ok: #4cc38a; --err: #f07167;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 560px; margin: 40px auto; padding: 0 16px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px; margin-top: 16px;
+  }
+  #status .dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--muted); margin-right: 6px;
+  }
+  #status.ok .dot { background: var(--ok); }
+  #status.err .dot { background: var(--err); }
+  label.drop {
+    display: block; border: 2px dashed var(--border); border-radius: 8px;
+    padding: 22px; text-align: center; cursor: pointer; color: var(--muted);
+  }
+  label.drop:hover { border-color: var(--accent); }
+  input[type=file] { display: none; }
+  #preview {
+    display: none; max-width: 160px; max-height: 160px; margin: 14px auto 0;
+    border-radius: 6px; image-rendering: pixelated;
+  }
+  button {
+    margin-top: 14px; width: 100%; padding: 10px; font-size: 15px;
+    border: 0; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  #result h2 { margin: 0; font-size: 20px; text-transform: capitalize; }
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; }
+  .row .name { width: 90px; text-transform: capitalize; }
+  .row .track { flex: 1; background: var(--bar); border-radius: 4px; height: 10px; overflow: hidden; }
+  .row .fill { background: var(--accent); height: 100%; }
+  .row .pct { width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+  .error { color: var(--err); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Image Classifier</h1>
+  <div class="muted">CIFAR-10 CNN · backend: <span id="backend"></span></div>
+
+  <div class="card">
+    <div id="status"><span class="dot"></span><span id="status-text">Checking API…</span></div>
+  </div>
+
+  <div class="card">
+    <label class="drop" for="file">Click to choose an image (PNG or JPEG)</label>
+    <input id="file" type="file" accept="image/png,image/jpeg">
+    <img id="preview" alt="Selected image">
+    <button id="predict" disabled>Predict</button>
+  </div>
+
+  <div class="card" id="result" hidden></div>
+</main>
+
+<script>
+  // The page only calls its own /api/* (the Vercel function in api/[endpoint].js), which
+  // forwards to the backend named by the API_BASE_URL env var in the Vercel project.
+  const API = "/api";
+  fetch(`${API}/config`).then(r => r.json())
+    .then(c => { document.getElementById("backend").textContent = c.backend || "not configured"; })
+    .catch(() => { document.getElementById("backend").textContent = "unknown"; });
+
+  const fileInput = document.getElementById("file");
+  const preview = document.getElementById("preview");
+  const button = document.getElementById("predict");
+  const result = document.getElementById("result");
+  let imageBase64 = null;
+
+  async function checkStatus() {
+    const box = document.getElementById("status");
+    const text = document.getElementById("status-text");
+    try {
+      const res = await fetch(`${API}/version`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const v = await res.json();
+      const acc = v.test_metrics?.test_accuracy;
+      box.className = "ok";
+      text.textContent = `API online · model ${v.model_name} v${v.model_version}` +
+        (acc ? ` · test accuracy ${(acc * 100).toFixed(1)}%` : "");
+    } catch (e) {
+      box.className = "err";
+      text.textContent = `API unreachable (${e.message})`;
+    }
+  }
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      preview.src = reader.result;
+      preview.style.display = "block";
+      imageBase64 = reader.result.split(",")[1]; // strip the data:image/...;base64, prefix
+      button.disabled = false;
+      result.hidden = true;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    button.textContent = "Predicting…";
+    result.hidden = false;
+    try {
+      const res = await fetch(`${API}/predict`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_base64: imageBase64 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : `HTTP ${res.status}`);
+      renderResult(data);
+    } catch (e) {
+      result.innerHTML = `<p class="error">Prediction failed: ${e.message}</p>`;
+    } finally {
+      button.disabled = false;
+      button.textContent = "Predict";
+    }
+  });
+
+  function renderResult(data) {
+    const rows = Object.entries(data.probabilities)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, p]) => `
+        <div class="row">
+          <span class="name">${name}</span>
+          <span class="track"><span class="fill" style="width:${(p * 100).toFixed(1)}%; display:block"></span></span>
+          <span class="pct">${(p * 100).toFixed(1)}%</span>
+        </div>`).join("");
+    result.innerHTML = `
+      <div class="muted">Prediction</div>
+      <h2>${data.label}</h2>
+      <div class="muted">${(data.confidence * 100).toFixed(1)}% confidence · model v${data.model_version}</div>
+      <div style="margin-top:12px">${rows}</div>`;
+  }
+
+  checkStatus();
+</script>
+</body>
+</html>

@@ -24,6 +24,10 @@ pip install -r serving/requirements.txt -r serving/requirements-dev.txt torchvis
 ruff check . && pytest
 ```
 
+Frontend: `frontend/` is a single page plus a Vercel function. It is deployed on
+**Vercel** with env var `API_BASE_URL`, separately from the Oracle VM and outside CI.
+See [DEPLOYMENT.md §5b](docs/DEPLOYMENT.md).
+
 API, per model (`/cnn/...`, `/rnn/...` behind nginx):
 
 | Endpoint | |

@@ -119,6 +119,24 @@ curl -X POST https://<domain>/rnn/predict -H 'Content-Type: application/json' \
 
 Interactive docs: `https://<domain>/cnn/docs`.
 
+## 5b. Frontend on Vercel (separate from the VM)
+
+The `frontend/` page doesn't run on the Oracle VM, and CI doesn't build or deploy it.
+`ci.yml` ignores `frontend/**`. Vercel deploys it from the same GitHub repo:
+
+1. Go to vercel.com → **Add New → Project** → import `INEcodes/ML-Production-Application`.
+2. **Root Directory:** `frontend`. **Framework Preset:** Other. Leave the build and
+   output settings empty: it's a static page plus one function.
+3. **Environment Variables:** `API_BASE_URL` = `https://<domain>/cnn`. Apply it to
+   Production and Preview.
+4. Click **Deploy**. Afterwards every push redeploys it. To skip Vercel builds for
+   backend-only commits, set Settings → Git → **Ignored Build Step** to
+   `git diff HEAD^ HEAD --quiet -- .`
+
+The browser only calls the page's own `/api/{health,version,predict}`. The function in
+`frontend/api/[endpoint].js` forwards those calls to `API_BASE_URL`, so the backend needs
+no CORS setup. Changing the backend URL means editing the Vercel env var and redeploying.
+
 ## 6. Standing update procedure
 
 **New model** (no image rebuild):

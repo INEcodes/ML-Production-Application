@@ -1,0 +1,6 @@
+{
+  "name": "ml-classifier-frontend",
+  "private": true,
+  "type": "module",
+  "description": "Static page + one Vercel function that proxies to the model API (API_BASE_URL)."
+}

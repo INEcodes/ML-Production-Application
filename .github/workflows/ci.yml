@@ -4,10 +4,20 @@ name: ci
 # -> SSH deploy to the Always Free VM.  Build/deploy only run once the repository
 # variable DEPLOY_ENABLED is "true" (see docs/DEPLOYMENT.md for the secrets it needs).
 
+# Backend only: the frontend/ page is deployed separately by Vercel's Git integration,
+# so changes there (or to docs alone) never rebuild or redeploy the Oracle VM.
 on:
   pull_request:
+    paths-ignore:
+      - "frontend/**"
+      - "docs/**"
+      - "**.md"
   push:
     branches: [main]
+    paths-ignore:
+      - "frontend/**"
+      - "docs/**"
+      - "**.md"
   workflow_dispatch:
 
 permissions:

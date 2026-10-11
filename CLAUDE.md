@@ -55,6 +55,8 @@ serving/        # lightweight deps — never imports training/
   Dockerfile
   docker-compose.yml # what actually runs on the OCI VM (one service per model)
 tests/          # export<->serving contract test — the only code importing both sides
+frontend/       # static page + Vercel function proxying to API_BASE_URL — deployed on
+                # Vercel, NOT on the Oracle VM; CI ignores this directory entirely
 docs/
   ARCHITECTURE.md
   EXECUTION_PLAN.md
@@ -94,6 +96,11 @@ writes into `metrics.json`. If you change preprocessing in `training/datasets/`,
   hand an image to. CI builds the image, pushes it to OCIR, then SSHes into the Always
   Free VM (`scripts/deploy.sh`) to `docker compose pull && docker compose up -d`.
   Secrets (OCI credentials, SSH key) live in GitHub Actions secrets, never in the repo.
+- **The Oracle VM and CI are backend-only.** `frontend/` ships through Vercel's own Git
+  integration (project root `frontend/`, env var `API_BASE_URL`). Don't add frontend
+  build/deploy steps to `ci.yml` or serve the page from the VM's nginx. The page calls
+  its own `/api/*` Vercel function, which forwards to the backend, so the backend needs
+  no CORS config.
 - **Design around Always Free's limits, don't fight them.** One Ampere A1 instance (or a
   few small ones sharing the 4 OCPU / 24GB pool), 20GB Object Storage, and 10TB/month
   egress. That's enough for a single-replica inference API but not autoscaling or
