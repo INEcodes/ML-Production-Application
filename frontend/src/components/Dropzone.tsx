@@ -1,4 +1,4 @@
-import { ImagePlus } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
 import { ACCEPTED_TYPES } from "../lib/image";
 import { cx } from "./ui";
@@ -22,17 +22,19 @@ export function Dropzone({
     if (file && !disabled) onFile(file);
   };
 
+  const open = () => !disabled && input.current?.click();
+
   return (
     <div
       role="button"
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled}
       aria-label="Choose an image to classify"
-      onClick={() => !disabled && input.current?.click()}
+      onClick={open}
       onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && !disabled) {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          input.current?.click();
+          open();
         }
       }}
       onDragOver={(e) => {
@@ -42,29 +44,36 @@ export function Dropzone({
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
       className={cx(
-        "flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed text-center transition-colors",
-        compact ? "gap-1 px-4 py-4" : "gap-3 px-6 py-12",
-        dragging
-          ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40"
-          : "border-slate-300 hover:border-indigo-400 hover:bg-slate-50 dark:border-slate-700 dark:hover:border-indigo-500 dark:hover:bg-slate-800/50",
-        disabled && "pointer-events-none opacity-60",
+        "group cursor-pointer transition",
+        compact
+          ? "flex h-14 items-center gap-3 rounded-full py-1.5 pl-1.5 pr-5 ring-1 ring-line-strong hover:bg-subtle"
+          : "flex flex-col items-center justify-center gap-5 rounded-[24px] bg-subtle px-6 py-14 text-center",
+        dragging && (compact ? "bg-subtle ring-ink" : "ring-2 ring-ink"),
+        disabled && "pointer-events-none opacity-50",
       )}
     >
-      {!compact && (
-        <div className="grid size-12 place-items-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300">
-          <ImagePlus className="size-6" aria-hidden />
-        </div>
-      )}
-      <p className="text-sm">
-        <span className="font-semibold text-indigo-600 dark:text-indigo-400">
-          {compact ? "Choose another image" : "Click to upload"}
-        </span>{" "}
-        <span className="text-slate-500 dark:text-slate-400">or drag and drop</span>
-      </p>
-      {!compact && (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          PNG, JPEG, WebP, GIF. You can also paste with Ctrl/⌘ + V
-        </p>
+      {compact ? (
+        <>
+          <span className="grid size-11 place-items-center rounded-full bg-primary text-on-primary">
+            <Plus className="size-5" aria-hidden />
+          </span>
+          <span className="text-sm">Choose another image</span>
+          <span className="ml-auto text-xs text-muted">or drop / paste</span>
+        </>
+      ) : (
+        <>
+          <span className="grid size-16 place-items-center rounded-full bg-primary text-on-primary transition group-hover:scale-105">
+            <Upload className="size-6" aria-hidden />
+          </span>
+          <div>
+            <p className="text-xl font-light tracking-tight">
+              {dragging ? "Drop it here" : "Drop an image, or click to browse"}
+            </p>
+            <p className="mt-1.5 text-xs text-muted">
+              PNG · JPEG · WebP · GIF. Paste works too: Ctrl/⌘ + V
+            </p>
+          </div>
+        </>
       )}
       <input
         ref={input}

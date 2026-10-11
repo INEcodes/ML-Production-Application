@@ -32,5 +32,13 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   const body: unknown = await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(detailMessage(body, res.status), res.status);
+  // A 200 that isn't JSON means /api/* never reached the proxy (e.g. it fell through
+  // to index.html). Never hand that to the UI as data.
+  if (body === null || typeof body !== "object") {
+    throw new ApiError(
+      "The API returned an unexpected response. Check that API_BASE_URL is configured.",
+      res.status,
+    );
+  }
   return body as T;
 }

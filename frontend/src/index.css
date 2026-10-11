@@ -2,8 +2,58 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+/* Monochrome tokens. Components use these (bg-surface, text-ink, bg-contrast, ...),
+   so light/dark is switched here once instead of with dark: on every element. */
+:root {
+  --canvas: #e7e7e8;
+  --surface: #ffffff;
+  --subtle: #f2f2f3;
+  --ink: #0b0b0c;
+  --muted: #7a7a80;
+  --line: #e3e3e6;
+  --line-strong: #cbcbd0;
+  --primary: #0b0b0c;
+  --on-primary: #ffffff;
+  --contrast: #0b0b0c;
+  --on-contrast: #ffffff;
+  --contrast-muted: #8f8f96;
+  --contrast-line: #2b2b30;
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 18px 40px -18px rgb(0 0 0 / 0.18);
+}
+
+:root.dark {
+  --canvas: #09090a;
+  --surface: #141416;
+  --subtle: #1c1c1f;
+  --ink: #f1f1f2;
+  --muted: #8c8c93;
+  --line: #242428;
+  --line-strong: #38383e;
+  --primary: #f1f1f2;
+  --on-primary: #0b0b0c;
+  --contrast: #000000;
+  --on-contrast: #ffffff;
+  --contrast-muted: #8c8c93;
+  --contrast-line: #26262b;
+  --card-shadow: 0 0 0 1px var(--line);
+}
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-subtle: var(--subtle);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-contrast: var(--contrast);
+  --color-on-contrast: var(--on-contrast);
+  --color-contrast-muted: var(--contrast-muted);
+  --color-contrast-line: var(--contrast-line);
+  --shadow-card: var(--card-shadow);
 }
 
 @layer base {
@@ -14,10 +64,36 @@
     color-scheme: dark;
   }
   body {
-    @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+    @apply bg-canvas font-sans text-ink antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  /* Soft light-and-shadow wash behind the frosted cards. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(60% 50% at 12% 8%, rgb(255 255 255 / 0.9), transparent 70%),
+      radial-gradient(45% 40% at 85% 15%, rgb(255 255 255 / 0.6), transparent 70%),
+      linear-gradient(115deg, transparent 40%, rgb(0 0 0 / 0.05) 55%, transparent 70%),
+      radial-gradient(50% 60% at 70% 95%, rgb(0 0 0 / 0.06), transparent 70%);
+  }
+  .dark body::before {
+    background:
+      radial-gradient(60% 50% at 12% 8%, rgb(255 255 255 / 0.05), transparent 70%),
+      radial-gradient(50% 60% at 80% 100%, rgb(255 255 255 / 0.03), transparent 70%);
   }
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-indigo-500;
+    @apply outline-2 outline-offset-2 outline-ink;
+  }
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
 }
 

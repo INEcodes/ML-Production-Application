@@ -1,7 +1,7 @@
-import { History, Sparkles, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { History, ScanSearch, Sparkles, Trash2, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Badge, Button, Card, EmptyState } from "../components/ui";
+import { Badge, Button, Card, EmptyState, Eyebrow, IconCircle, PageHeader, SectionTitle } from "../components/ui";
 import { useHistory, type HistoryEntry } from "../hooks/useHistory";
 import { confidenceLevel, formatDate, pct, relativeTime, titleCase } from "../lib/format";
 
@@ -10,19 +10,21 @@ export function HistoryPage() {
   const [confirming, setConfirming] = useState(false);
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">History</h1>
-          <p className="mt-1 text-slate-600 dark:text-slate-400">
-            Your last {entries.length > 0 ? entries.length : ""} predictions. Stored only in this
-            browser.
-          </p>
-        </div>
-        {entries.length > 0 &&
+    <div className="space-y-8">
+      <PageHeader
+        title="History"
+        meta={
+          <>
+            <span>
+              {entries.length} prediction{entries.length === 1 ? "" : "s"}
+            </span>
+            <span>Stored only in this browser</span>
+          </>
+        }
+        action={
+          entries.length > 0 &&
           (confirming ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600 dark:text-slate-400">Clear everything?</span>
               <Button
                 variant="danger"
                 onClick={() => {
@@ -30,9 +32,9 @@ export function HistoryPage() {
                   setConfirming(false);
                 }}
               >
-                Yes, clear
+                Yes, clear all
               </Button>
-              <Button variant="ghost" onClick={() => setConfirming(false)}>
+              <Button variant="secondary" onClick={() => setConfirming(false)}>
                 Cancel
               </Button>
             </div>
@@ -41,86 +43,148 @@ export function HistoryPage() {
               <Trash2 className="size-4" aria-hidden />
               Clear history
             </Button>
-          ))}
-      </header>
+          ))
+        }
+      />
 
       {entries.length === 0 ? (
         <Card>
           <EmptyState
-            icon={<History className="size-7" aria-hidden />}
+            icon={<History className="size-6" aria-hidden />}
             title="Nothing here yet"
             action={
               <Link
                 to="/"
-                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"
+                className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-on-primary hover:opacity-85"
               >
-                <Sparkles className="size-4" aria-hidden />
+                <ScanSearch className="size-4" aria-hidden />
                 Make your first prediction
               </Link>
             }
           >
-            Every prediction you make is saved here so you can compare results across images and
+            Every prediction you make is saved here so you can compare results across inputs and
             model versions.
           </EmptyState>
         </Card>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {entries.map((e) => (
-            <HistoryCard key={e.id} entry={e} onRemove={() => remove(e.id)} />
-          ))}
-        </ul>
+        <div className="grid items-start gap-5 lg:grid-cols-12">
+          <Card className="lg:col-span-8">
+            <SectionTitle hint="Newest first">All predictions</SectionTitle>
+            <ul className="space-y-2.5">
+              {entries.map((e) => (
+                <HistoryRow key={e.id} entry={e} onRemove={() => remove(e.id)} />
+              ))}
+            </ul>
+          </Card>
+          <Overview entries={entries} />
+        </div>
       )}
     </div>
   );
 }
 
-function HistoryCard({ entry, onRemove }: { entry: HistoryEntry; onRemove: () => void }) {
+function HistoryRow({ entry, onRemove }: { entry: HistoryEntry; onRemove: () => void }) {
   const { result, input } = entry;
   const level = confidenceLevel(result.confidence);
-  const runnersUp = Object.entries(result.probabilities)
-    .sort((a, b) => b[1] - a[1])
-    .slice(1, 3);
+  const runnerUp = Object.entries(result.probabilities).sort((a, b) => b[1] - a[1])[1];
 
   return (
-    <li className="group relative flex gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <li className="group flex min-h-16 items-center gap-4 rounded-full py-1.5 pl-1.5 pr-3 ring-1 ring-line-strong transition hover:bg-subtle">
       {input.kind === "image" ? (
-        <img
-          src={input.thumbnail}
-          alt={input.name}
-          className="size-20 shrink-0 rounded-xl object-cover"
-        />
+        <img src={input.thumbnail} alt={input.name} className="size-[52px] shrink-0 rounded-full object-cover" />
       ) : (
-        <p className="line-clamp-4 h-20 w-24 shrink-0 rounded-xl bg-slate-50 p-2 text-[11px] leading-snug text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          {input.text}
-        </p>
+        <IconCircle className="!size-[52px]">
+          <Sparkles className="size-4" aria-hidden />
+        </IconCircle>
       )}
       <div className="min-w-0 flex-1">
-        <p className="truncate font-semibold">{titleCase(result.label)}</p>
-        <div className="mt-1">
-          <Badge tone={level === "high" ? "success" : level === "medium" ? "warning" : "danger"}>
-            {pct(result.confidence)} confident
-          </Badge>
-        </div>
-        {runnersUp.length > 0 && (
-          <p className="mt-2 truncate text-xs text-slate-500 dark:text-slate-400">
-            then {runnersUp.map(([n, p]) => `${titleCase(n)} ${pct(p, 0)}`).join(", ")}
-          </p>
-        )}
-        <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-          <time dateTime={entry.createdAt} title={formatDate(entry.createdAt)}>
-            {relativeTime(entry.createdAt)}
-          </time>{" "}
-          · v{result.model_version}
+        <p className="truncate font-medium">{titleCase(result.label)}</p>
+        <p className="truncate text-xs text-muted">
+          {input.kind === "text" ? `“${input.text}”` : input.name}
+          {runnerUp && ` · then ${titleCase(runnerUp[0])} ${pct(runnerUp[1], 0)}`}
         </p>
       </div>
+      <div className="hidden w-28 sm:block">
+        <div className="mb-1 flex justify-between text-[11px] tabular-nums text-muted">
+          <span>{pct(result.confidence, 0)}</span>
+          <span>v{result.model_version}</span>
+        </div>
+        <span className="block h-[3px] overflow-hidden rounded-full bg-line">
+          <span className="block h-full rounded-full bg-primary" style={{ width: `${result.confidence * 100}%` }} />
+        </span>
+      </div>
+      <span className="sm:hidden">
+        <Badge tone={level === "high" ? "solid" : level === "medium" ? "outline" : "dashed"}>
+          {pct(result.confidence, 0)}
+        </Badge>
+      </span>
+      <time
+        dateTime={entry.createdAt}
+        title={formatDate(entry.createdAt)}
+        className="hidden w-24 text-right text-xs text-muted md:block"
+      >
+        {relativeTime(entry.createdAt)}
+      </time>
       <button
         type="button"
         onClick={onRemove}
-        aria-label="Remove from history"
-        className="absolute right-2 top-2 grid size-7 place-items-center rounded-full text-slate-400 opacity-100 hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 sm:opacity-0 sm:group-hover:opacity-100"
+        aria-label={`Remove ${titleCase(result.label)} from history`}
+        className="grid size-9 shrink-0 place-items-center rounded-full text-muted transition hover:bg-primary hover:text-on-primary"
       >
         <X className="size-4" aria-hidden />
       </button>
     </li>
+  );
+}
+
+/** Black summary card with a white bar chart of predicted labels. */
+function Overview({ entries }: { entries: HistoryEntry[] }) {
+  const { avg, counts, max } = useMemo(() => {
+    const counts = new Map<string, number>();
+    let sum = 0;
+    for (const e of entries) {
+      sum += e.result.confidence;
+      counts.set(e.result.label, (counts.get(e.result.label) ?? 0) + 1);
+    }
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+    return { avg: sum / entries.length, counts: sorted, max: sorted[0]?.[1] ?? 1 };
+  }, [entries]);
+
+  return (
+    <Card tone="contrast" className="lg:sticky lg:top-28 lg:col-span-4">
+      <SectionTitle onContrast hint="Across everything in your history">
+        Overview
+      </SectionTitle>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Eyebrow onContrast>Predictions</Eyebrow>
+          <p className="mt-1 text-4xl font-light tabular-nums">{entries.length}</p>
+        </div>
+        <div>
+          <Eyebrow onContrast>Avg. confidence</Eyebrow>
+          <p className="mt-1 text-4xl font-light tabular-nums">{pct(avg, 0)}</p>
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <Eyebrow onContrast>Most predicted</Eyebrow>
+        <div className="mt-4 flex h-40 items-end gap-3" role="list">
+          {counts.map(([label, n]) => (
+            <div key={label} role="listitem" className="flex min-w-0 flex-1 flex-col items-center gap-2">
+              <span className="text-[11px] tabular-nums text-contrast-muted">{n}</span>
+              {/* striped bars echo the reference's "Development" chart */}
+              <span
+                className="w-full rounded-sm bg-[repeating-linear-gradient(to_top,var(--on-contrast)_0_3px,transparent_3px_6px)]"
+                style={{ height: `${Math.max((n / max) * 100, 8)}px` }}
+                aria-label={`${titleCase(label)}: ${n}`}
+              />
+              <span className="w-full truncate text-center text-[10px] uppercase tracking-wide text-contrast-muted">
+                {titleCase(label)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
   );
 }

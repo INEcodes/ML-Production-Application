@@ -1,11 +1,34 @@
-import { CheckCircle2, CircleHelp, Lightbulb, RotateCcw, Send, Sparkles, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import {
+  ArrowUpRight,
+  CircleHelp,
+  Gauge,
+  History as HistoryIcon,
+  Layers,
+  RotateCcw,
+  Send,
+  Sparkles,
+  Tag,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Dropzone } from "../components/Dropzone";
 import { ProbabilityBars } from "../components/ProbabilityBars";
-import { Badge, Button, Card, EmptyState, ErrorState, SectionTitle, Skeleton } from "../components/ui";
-import { useHistory } from "../hooks/useHistory";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Eyebrow,
+  IconCircle,
+  PageHeader,
+  SectionTitle,
+  Skeleton,
+} from "../components/ui";
+import { useHistory, type HistoryEntry } from "../hooks/useHistory";
 import { usePredict, useVersion } from "../hooks/useModel";
-import { confidenceCopy, confidenceLevel, pct, titleCase } from "../lib/format";
+import { confidenceCopy, confidenceLevel, pct, relativeTime, titleCase } from "../lib/format";
 import { prepareImage, type PreparedImage } from "../lib/image";
 import type { PredictResponse, VersionResponse } from "../types/api";
 
@@ -18,24 +41,29 @@ const TEXT_EXAMPLES = [
 
 export function ClassifyPage() {
   const version = useVersion();
+  const today = new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          {version.data?.input_type === "text" ? "Classify a piece of text" : "Classify an image"}
-        </h1>
-        <p className="mt-1 text-slate-600 dark:text-slate-400">
-          {version.data?.input_type === "text"
-            ? "Paste a headline or short article and the model predicts its topic."
-            : "Upload a photo and the model tells you what it sees, with how sure it is."}
-        </p>
-      </header>
+    <div className="space-y-8">
+      <PageHeader
+        title="Classify"
+        meta={
+          <>
+            <span>{today}</span>
+            {version.data && (
+              <span>
+                {version.data.model_name.toUpperCase()} · v{version.data.model_version} ·{" "}
+                {version.data.input_type} model
+              </span>
+            )}
+          </>
+        }
+      />
 
       {version.isPending ? (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Skeleton className="h-80" />
-          <Skeleton className="h-80" />
+        <div className="grid gap-5 lg:grid-cols-12">
+          <Skeleton className="h-96 lg:col-span-7" />
+          <Skeleton className="h-96 lg:col-span-5" />
         </div>
       ) : version.isError ? (
         <ErrorState
@@ -71,16 +99,14 @@ function Classifier({ model }: { model: VersionResponse }) {
         setInputError((e as Error).message);
         return;
       }
-      setImage({ ...prepared, name: file.name || "Pasted image" });
+      const name = file.name || "Pasted image";
+      setImage({ ...prepared, name });
       // Classify straight away: picking an image is the intent, no extra click needed.
       prediction.mutate(
         { image_base64: prepared.base64 },
         {
           onSuccess: (result) =>
-            history.add(
-              { kind: "image", thumbnail: prepared.thumbnail, name: file.name || "Pasted image" },
-              result,
-            ),
+            history.add({ kind: "image", thumbnail: prepared.thumbnail, name }, result),
         },
       );
     },
@@ -118,32 +144,33 @@ function Classifier({ model }: { model: VersionResponse }) {
   };
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-2">
-      <Card>
-        <SectionTitle hint={isImage ? "Step 1: pick an image" : "Step 1: enter some text"}>
+    <div className="grid items-start gap-5 lg:grid-cols-12">
+      {/* ---- input ---- */}
+      <Card className="lg:col-span-7">
+        <SectionTitle
+          hint={isImage ? "Step 1 · pick an image" : "Step 1 · enter some text"}
+          action={
+            (image || text) && (
+              <Button variant="ghost" className="h-9 px-3" onClick={reset} disabled={prediction.isPending}>
+                <X className="size-4" aria-hidden /> Clear
+              </Button>
+            )
+          }
+        >
           Your input
         </SectionTitle>
 
         {isImage ? (
           image ? (
             <div className="space-y-4">
-              <div className="relative overflow-hidden rounded-xl bg-[repeating-conic-gradient(#e2e8f0_0_25%,transparent_0_50%)] bg-[length:16px_16px] dark:bg-[repeating-conic-gradient(#1e293b_0_25%,transparent_0_50%)]">
+              <div className="overflow-hidden rounded-[24px] bg-subtle">
                 <img
                   src={image.previewUrl}
                   alt={`Selected: ${image.name}`}
-                  className="mx-auto max-h-80 object-contain"
+                  className="mx-auto max-h-[22rem] object-contain"
                 />
-                <button
-                  type="button"
-                  onClick={reset}
-                  disabled={prediction.isPending}
-                  className="absolute right-2 top-2 grid size-8 place-items-center rounded-full bg-slate-900/70 text-white hover:bg-slate-900 disabled:opacity-50"
-                  aria-label="Remove image"
-                >
-                  <X className="size-4" aria-hidden />
-                </button>
               </div>
-              <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+              <p className="truncate px-1 text-[11px] uppercase tracking-[0.08em] text-muted">
                 {image.name} · {image.width}×{image.height}px
               </p>
               <Dropzone onFile={classifyImage} disabled={prediction.isPending} compact />
@@ -153,7 +180,7 @@ function Classifier({ model }: { model: VersionResponse }) {
           )
         ) : (
           <form
-            className="space-y-3"
+            className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               classifyText();
@@ -171,34 +198,33 @@ function Classifier({ model }: { model: VersionResponse }) {
               }}
               rows={6}
               maxLength={10_000}
-              placeholder="e.g. Stocks rallied after the central bank held rates."
-              className="w-full resize-y rounded-xl border border-slate-300 bg-white p-3 text-sm shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-950"
+              placeholder="Paste a headline or a short article…"
+              className="w-full resize-y rounded-[24px] bg-subtle p-5 text-[15px] placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-ink"
             />
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                {text.length.toLocaleString()} / 10,000 · Ctrl/⌘ + Enter to submit
+              <span className="text-[11px] uppercase tracking-[0.08em] text-muted">
+                {text.length.toLocaleString()} / 10,000 · Ctrl/⌘ + Enter
               </span>
               <Button type="submit" loading={prediction.isPending} disabled={!text.trim()}>
                 {!prediction.isPending && <Send className="size-4" aria-hidden />}
                 Classify
               </Button>
             </div>
-            <div>
-              <p className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Or try an example:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {TEXT_EXAMPLES.map((ex) => (
-                  <button
-                    key={ex}
-                    type="button"
-                    onClick={() => setText(ex)}
-                    className="max-w-full truncate rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 hover:border-indigo-400 hover:text-indigo-700 dark:border-slate-700 dark:text-slate-300 dark:hover:text-indigo-300"
-                  >
-                    {ex}
-                  </button>
-                ))}
-              </div>
+            <div className="space-y-2 pt-2">
+              <Eyebrow>Or try an example</Eyebrow>
+              {TEXT_EXAMPLES.map((ex) => (
+                <button
+                  key={ex}
+                  type="button"
+                  onClick={() => setText(ex)}
+                  className="flex h-12 w-full items-center gap-3 rounded-full py-1 pl-1 pr-5 text-left text-sm ring-1 ring-line-strong transition hover:bg-subtle"
+                >
+                  <IconCircle size="sm" className="!size-10">
+                    <Sparkles className="size-4" aria-hidden />
+                  </IconCircle>
+                  <span className="truncate">{ex}</span>
+                </button>
+              ))}
             </div>
           </form>
         )}
@@ -208,28 +234,13 @@ function Classifier({ model }: { model: VersionResponse }) {
             <ErrorState title="That file didn't work" message={inputError} />
           </div>
         )}
-
-        <div className="mt-6 rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50">
-          <p className="flex items-center gap-1.5 text-sm font-medium">
-            <Lightbulb className="size-4 text-amber-500" aria-hidden />
-            The model knows {model.labels.length} classes
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {model.labels.map((l) => (
-              <Badge key={l}>{titleCase(l)}</Badge>
-            ))}
-          </div>
-          {isImage && (
-            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-              Best results: one clear subject, centered, filling most of the frame. Images are
-              shrunk to tiny thumbnails before the model sees them.
-            </p>
-          )}
-        </div>
       </Card>
 
-      <Card className="lg:sticky lg:top-24">
-        <SectionTitle hint="Step 2: see what the model thinks">Result</SectionTitle>
+      {/* ---- result (black feature card) ---- */}
+      <Card tone="contrast" className="min-h-[24rem] lg:sticky lg:top-28 lg:col-span-5">
+        <SectionTitle onContrast hint="Step 2 · what the model thinks">
+          Result
+        </SectionTitle>
         <ResultPanel
           pending={prediction.isPending}
           error={prediction.error}
@@ -239,7 +250,133 @@ function Classifier({ model }: { model: VersionResponse }) {
           isImage={isImage}
         />
       </Card>
+
+      {/* ---- model strip ---- */}
+      <Card className="lg:col-span-7">
+        <SectionTitle
+          hint="What this model can recognise"
+          action={
+            <Link to="/model" aria-label="Model details">
+              <IconCircle size="sm">
+                <ArrowUpRight className="size-4" aria-hidden />
+              </IconCircle>
+            </Link>
+          }
+        >
+          Model
+        </SectionTitle>
+        <div className="grid gap-5 sm:grid-cols-3">
+          <Metric
+            icon={<Gauge className="size-4" aria-hidden />}
+            label="Test accuracy"
+            value={
+              model.test_metrics?.test_accuracy !== undefined ? pct(model.test_metrics.test_accuracy) : "n/a"
+            }
+            fill={model.test_metrics?.test_accuracy}
+          />
+          <Metric icon={<Layers className="size-4" aria-hidden />} label="Classes" value={String(model.labels.length)} />
+          <Metric
+            icon={<Tag className="size-4" aria-hidden />}
+            label="Version"
+            value={`v${model.model_version}`}
+          />
+        </div>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {model.labels.map((l) => (
+            <Badge key={l} tone="outline">
+              {titleCase(l)}
+            </Badge>
+          ))}
+        </div>
+        {isImage && (
+          <p className="mt-5 text-xs text-muted">
+            Best results: one clear subject, centred, filling most of the frame. Images are shrunk
+            to 32×32 before the model sees them.
+          </p>
+        )}
+      </Card>
+
+      {/* ---- recent ---- */}
+      <RecentCard entries={history.entries.slice(0, 4)} />
     </div>
+  );
+}
+
+function Metric({
+  icon,
+  label,
+  value,
+  fill,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  fill?: number;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <IconCircle size="sm" className="!size-10">
+        {icon}
+      </IconCircle>
+      <div className="min-w-0 flex-1">
+        <Eyebrow>{label}</Eyebrow>
+        <div className="flex items-center gap-3">
+          <span className="text-xl font-light tabular-nums">{value}</span>
+          {fill !== undefined && (
+            <span className="h-[3px] flex-1 overflow-hidden rounded-full bg-line">
+              <span className="block h-full rounded-full bg-primary" style={{ width: `${fill * 100}%` }} />
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecentCard({ entries }: { entries: HistoryEntry[] }) {
+  return (
+    <Card className="lg:col-span-5">
+      <SectionTitle
+        hint="Your latest predictions"
+        action={
+          <Link to="/history" aria-label="All history">
+            <IconCircle size="sm">
+              <ArrowUpRight className="size-4" aria-hidden />
+            </IconCircle>
+          </Link>
+        }
+      >
+        Recent
+      </SectionTitle>
+      {entries.length === 0 ? (
+        <div className="flex h-14 items-center gap-3 rounded-full py-1 pl-1 pr-5 text-sm text-muted border border-dashed border-line-strong">
+          <IconCircle size="sm" className="!size-11 !bg-subtle !text-muted">
+            <HistoryIcon className="size-4" aria-hidden />
+          </IconCircle>
+          Nothing yet. Results will show up here.
+        </div>
+      ) : (
+        <ul className="space-y-2.5">
+          {entries.map((e) => (
+            <li
+              key={e.id}
+              className="flex h-14 items-center gap-3 rounded-full py-1 pl-1 pr-5 ring-1 ring-line-strong"
+            >
+              {e.input.kind === "image" ? (
+                <img src={e.input.thumbnail} alt="" className="size-11 shrink-0 rounded-full object-cover" />
+              ) : (
+                <IconCircle size="sm" className="!size-11">
+                  <Sparkles className="size-4" aria-hidden />
+                </IconCircle>
+              )}
+              <span className="min-w-0 flex-1 truncate text-sm">{titleCase(e.result.label)}</span>
+              <span className="text-xs tabular-nums text-muted">{pct(e.result.confidence, 0)}</span>
+              <span className="hidden text-xs text-muted sm:inline">{relativeTime(e.createdAt)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 
@@ -260,16 +397,15 @@ function ResultPanel({
 }) {
   if (pending) {
     return (
-      <div aria-live="polite" className="space-y-4">
-        <p className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Sparkles className="size-4 animate-pulse text-indigo-500" aria-hidden />
+      <div aria-live="polite" className="space-y-5">
+        <p className="flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-contrast-muted">
+          <Sparkles className="size-4 animate-pulse" aria-hidden />
           Asking the model…
         </p>
-        <Skeleton className="h-10 w-2/3" />
-        <Skeleton className="h-4 w-1/3" />
-        <div className="space-y-3 pt-2">
+        <Skeleton onContrast className="h-12 w-2/3" />
+        <div className="space-y-4 pt-4">
           {[0, 1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-3" />
+            <Skeleton key={i} onContrast className="h-2" />
           ))}
         </div>
       </div>
@@ -277,47 +413,48 @@ function ResultPanel({
   }
 
   if (error) {
-    return <ErrorState title="Prediction failed" message={error.message} onRetry={onRetry} />;
+    return <ErrorState onContrast title="Prediction failed" message={error.message} onRetry={onRetry} />;
   }
 
   if (!result) {
     return (
-      <EmptyState icon={<CircleHelp className="size-7" aria-hidden />} title="No prediction yet">
+      <EmptyState onContrast icon={<CircleHelp className="size-6" aria-hidden />} title="No prediction yet">
         {isImage
-          ? "Upload, drop or paste an image on the left. Results appear here instantly."
-          : "Type or pick an example on the left, then press Classify."}
+          ? "Upload, drop or paste an image. The answer appears here instantly."
+          : "Type or pick an example, then press Classify."}
       </EmptyState>
     );
   }
 
   const level = confidenceLevel(result.confidence);
   const copy = confidenceCopy[level];
-  const tone = level === "high" ? "success" : level === "medium" ? "warning" : "danger";
 
   return (
-    <div aria-live="polite" className="space-y-6">
+    <div aria-live="polite" className="space-y-8">
       <div>
-        <p className="text-sm text-slate-500 dark:text-slate-400">It looks like</p>
-        <p className="mt-1 flex flex-wrap items-center gap-3 text-3xl font-bold tracking-tight sm:text-4xl">
-          {titleCase(result.label)}
-          <Badge tone={tone}>
-            {level === "high" && <CheckCircle2 className="size-3.5" aria-hidden />}
-            {copy.title} · {pct(result.confidence)}
+        <Eyebrow onContrast>It looks like</Eyebrow>
+        <p className="mt-2 text-5xl font-light tracking-tight">{titleCase(result.label)}</p>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Badge onContrast tone={level === "high" ? "solid" : level === "medium" ? "outline" : "dashed"}>
+            {copy.title}
           </Badge>
-        </p>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.hint}</p>
+          <Badge onContrast tone="soft">{pct(result.confidence)} confidence</Badge>
+        </div>
+        <p className="mt-3 text-sm text-contrast-muted">{copy.hint}</p>
       </div>
 
       <div>
-        <h3 className="mb-3 text-sm font-medium">Top guesses</h3>
-        <ProbabilityBars probabilities={result.probabilities} />
+        <div className="mb-4">
+          <Eyebrow onContrast>Top guesses</Eyebrow>
+        </div>
+        <ProbabilityBars onContrast probabilities={result.probabilities} />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
-        <span className="text-xs text-slate-500 dark:text-slate-400">
-          {result.model_name.toUpperCase()} · model v{result.model_version} · saved to History
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-contrast-line pt-5">
+        <span className="text-[11px] uppercase tracking-[0.08em] text-contrast-muted">
+          {result.model_name} · v{result.model_version} · saved to history
         </span>
-        <Button variant="secondary" onClick={onReset}>
+        <Button variant="inverse" onClick={onReset}>
           <RotateCcw className="size-4" aria-hidden />
           Start over
         </Button>

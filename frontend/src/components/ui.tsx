@@ -3,17 +3,15 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "inverse";
 
 const variants: Record<Variant, string> = {
-  primary:
-    "bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 disabled:bg-indigo-400 dark:disabled:bg-indigo-800",
-  secondary:
-    "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700",
-  ghost:
-    "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
-  danger:
-    "text-rose-600 ring-1 ring-rose-200 hover:bg-rose-50 dark:text-rose-400 dark:ring-rose-900 dark:hover:bg-rose-950",
+  primary: "bg-primary text-on-primary hover:opacity-85",
+  secondary: "bg-surface text-ink ring-1 ring-line-strong hover:bg-subtle",
+  ghost: "text-muted hover:bg-subtle hover:text-ink",
+  danger: "text-rose-600 ring-1 ring-rose-300 hover:bg-rose-50 dark:text-rose-400 dark:ring-rose-900 dark:hover:bg-rose-950",
+  // for use on black (contrast) cards
+  inverse: "bg-on-contrast text-contrast hover:opacity-85",
 };
 
 export function Button({
@@ -30,7 +28,7 @@ export function Button({
       {...rest}
       disabled={disabled || loading}
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed",
+        "inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50",
         variants[variant],
         className,
       )}
@@ -41,19 +39,51 @@ export function Button({
   );
 }
 
+/** The reference's signature element: a solid black circle holding an icon. */
+export function IconCircle({
+  children,
+  size = "md",
+  inverse,
+  className,
+}: {
+  children: ReactNode;
+  size?: "sm" | "md" | "lg";
+  inverse?: boolean;
+  className?: string;
+}) {
+  const sizes = { sm: "size-8", md: "size-11", lg: "size-14" };
+  return (
+    <span
+      className={cx(
+        "grid shrink-0 place-items-center rounded-full",
+        inverse ? "bg-on-contrast text-contrast" : "bg-primary text-on-primary",
+        sizes[size],
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function Card({
   className,
   children,
+  tone = "surface",
   as: Tag = "section",
 }: {
   className?: string;
   children: ReactNode;
+  tone?: "surface" | "contrast";
   as?: "section" | "div" | "article";
 }) {
   return (
     <Tag
       className={cx(
-        "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6",
+        "rounded-[28px] p-6 sm:p-7",
+        tone === "surface"
+          ? "bg-surface/90 shadow-card backdrop-blur-xl"
+          : "bg-contrast text-on-contrast ring-1 ring-contrast-line",
         className,
       )}
     >
@@ -62,33 +92,72 @@ export function Card({
   );
 }
 
-export function SectionTitle({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
+export function SectionTitle({
+  children,
+  hint,
+  action,
+  onContrast,
+}: {
+  children: ReactNode;
+  hint?: ReactNode;
+  action?: ReactNode;
+  onContrast?: boolean;
+}) {
   return (
-    <div className="mb-4">
-      <h2 className="text-base font-semibold">{children}</h2>
-      {hint && <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{hint}</p>}
+    <div className="mb-5 flex items-start justify-between gap-4">
+      <div>
+        <h2 className="text-lg font-normal tracking-tight">{children}</h2>
+        {hint && (
+          <p className={cx("mt-0.5 text-xs", onContrast ? "text-contrast-muted" : "text-muted")}>
+            {hint}
+          </p>
+        )}
+      </div>
+      {action}
     </div>
   );
 }
 
+export function Eyebrow({ children, onContrast }: { children: ReactNode; onContrast?: boolean }) {
+  return (
+    <p
+      className={cx(
+        "text-[11px] font-medium uppercase tracking-[0.08em]",
+        onContrast ? "text-contrast-muted" : "text-muted",
+      )}
+    >
+      {children}
+    </p>
+  );
+}
+
+/** solid = black pill, outline = hairline pill, dashed = uncertain, soft = grey chip. */
 export function Badge({
   children,
-  tone = "neutral",
+  tone = "soft",
+  onContrast,
 }: {
   children: ReactNode;
-  tone?: "neutral" | "success" | "warning" | "danger" | "brand";
+  tone?: "solid" | "outline" | "dashed" | "soft";
+  onContrast?: boolean;
 }) {
-  const tones = {
-    neutral: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-    success: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-    warning: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-    danger: "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
-    brand: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
-  };
+  const tones = onContrast
+    ? {
+        solid: "bg-on-contrast text-contrast",
+        outline: "ring-1 ring-on-contrast/60 text-on-contrast",
+        dashed: "border border-dashed border-on-contrast/50 text-on-contrast",
+        soft: "bg-white/10 text-on-contrast",
+      }
+    : {
+        solid: "bg-primary text-on-primary",
+        outline: "ring-1 ring-line-strong text-ink",
+        dashed: "border border-dashed border-line-strong text-muted",
+        soft: "bg-subtle text-ink",
+      };
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium",
+        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
         tones[tone],
       )}
     >
@@ -97,11 +166,15 @@ export function Badge({
   );
 }
 
-export function Skeleton({ className }: { className?: string }) {
+export function Skeleton({ className, onContrast }: { className?: string; onContrast?: boolean }) {
   return (
     <div
       aria-hidden
-      className={cx("animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800", className)}
+      className={cx(
+        "animate-pulse rounded-2xl",
+        onContrast ? "bg-white/10" : "bg-subtle",
+        className,
+      )}
     />
   );
 }
@@ -111,24 +184,31 @@ export function ErrorState({
   message,
   onRetry,
   retrying,
+  onContrast,
 }: {
   title?: string;
   message: string;
   onRetry?: () => void;
   retrying?: boolean;
+  onContrast?: boolean;
 }) {
   return (
     <div
       role="alert"
-      className="flex flex-col items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm dark:border-rose-900 dark:bg-rose-950/50 sm:flex-row sm:items-center"
+      className={cx(
+        "flex flex-col items-start gap-4 rounded-3xl p-5 text-sm sm:flex-row sm:items-center",
+        onContrast ? "bg-white/5 ring-1 ring-contrast-line" : "bg-surface shadow-card",
+      )}
     >
-      <AlertTriangle className="size-5 shrink-0 text-rose-600 dark:text-rose-400" aria-hidden />
+      <span className="grid size-11 shrink-0 place-items-center rounded-full bg-rose-500/10 text-rose-500">
+        <AlertTriangle className="size-5" aria-hidden />
+      </span>
       <div className="flex-1">
-        <p className="font-medium text-rose-800 dark:text-rose-200">{title}</p>
-        <p className="text-rose-700 dark:text-rose-300">{message}</p>
+        <p className="font-medium">{title}</p>
+        <p className={onContrast ? "text-contrast-muted" : "text-muted"}>{message}</p>
       </div>
       {onRetry && (
-        <Button variant="secondary" onClick={onRetry} loading={retrying}>
+        <Button variant={onContrast ? "inverse" : "primary"} onClick={onRetry} loading={retrying}>
           {!retrying && <RotateCw className="size-4" aria-hidden />}
           Try again
         </Button>
@@ -142,23 +222,51 @@ export function EmptyState({
   title,
   children,
   action,
+  onContrast,
 }: {
   icon: ReactNode;
   title: string;
   children?: ReactNode;
   action?: ReactNode;
+  onContrast?: boolean;
 }) {
   return (
-    <div className="flex flex-col items-center px-4 py-12 text-center">
-      <div className="mb-4 grid size-14 place-items-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300">
+    <div className="flex flex-col items-center px-4 py-10 text-center">
+      <IconCircle size="lg" inverse={onContrast}>
         {icon}
-      </div>
-      <h3 className="text-base font-semibold">{title}</h3>
+      </IconCircle>
+      <h3 className="mt-5 text-lg font-normal tracking-tight">{title}</h3>
       {children && (
-        <p className="mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">{children}</p>
+        <p className={cx("mt-1 max-w-xs text-sm", onContrast ? "text-contrast-muted" : "text-muted")}>
+          {children}
+        </p>
       )}
-      {action && <div className="mt-5">{action}</div>}
+      {action && <div className="mt-6">{action}</div>}
     </div>
+  );
+}
+
+export function PageHeader({
+  title,
+  meta,
+  action,
+}: {
+  title: string;
+  meta?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 className="text-4xl font-light tracking-tight sm:text-5xl">{title}</h1>
+        {meta && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs uppercase tracking-[0.08em] text-muted">
+            {meta}
+          </div>
+        )}
+      </div>
+      {action}
+    </header>
   );
 }
 

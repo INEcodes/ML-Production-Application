@@ -1,16 +1,17 @@
-import { Boxes, Cpu, History, Info, Monitor, Moon, Sparkles, Sun } from "lucide-react";
+import { Activity, Cpu, History, Info, Monitor, Moon, ScanSearch, Sun } from "lucide-react";
 import { useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useHistory } from "../hooks/useHistory";
 import { useHealth } from "../hooks/useModel";
 import { useTheme, type ThemeMode } from "../hooks/useTheme";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { cx } from "./ui";
 
 const NAV = [
-  { to: "/", label: "Classify", icon: Sparkles, end: true },
-  { to: "/history", label: "History", icon: History },
-  { to: "/model", label: "Model", icon: Cpu },
-  { to: "/about", label: "How it works", shortLabel: "About", icon: Info },
+  { to: "/", label: "Classify", icon: ScanSearch, end: true },
+  { to: "/history", label: "History", icon: History, end: false },
+  { to: "/model", label: "Model", icon: Cpu, end: false },
+  { to: "/about", label: "How it works", short: "About", icon: Info, end: false },
 ] as const;
 
 const TITLES: Record<string, string> = {
@@ -20,35 +21,38 @@ const TITLES: Record<string, string> = {
   "/about": "How it works",
 };
 
+/** Black circle + white pill, like the reference's "Video call" control. */
 function StatusPill() {
   const { data, isPending, isError } = useHealth();
   const state = isPending ? "checking" : isError ? "down" : "up";
-  const text = {
-    checking: "Checking API…",
-    down: "API offline",
-    up: `${data?.model_name.toUpperCase()} v${data?.model_version} online`,
-  }[state];
+  const label = data ? `${data.model_name.toUpperCase()} v${data.model_version}` : "Model API";
+  const status = { checking: "Checking…", down: "Offline", up: "Online" }[state];
   return (
     <Link
       to="/model"
-      title="Model API status (click for details)"
-      className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
+      title="Model API status. Click for details"
+      className="flex h-12 items-center gap-3 rounded-full bg-surface/90 py-1 pl-1 pr-4 shadow-card backdrop-blur-xl transition hover:bg-surface"
     >
-      <span className="relative flex size-2">
-        {state === "up" && (
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-        )}
-        <span
-          className={cx(
-            "relative inline-flex size-2 rounded-full",
-            state === "up" && "bg-emerald-500",
-            state === "down" && "bg-rose-500",
-            state === "checking" && "bg-slate-400",
-          )}
-        />
+      <span className="grid size-10 place-items-center rounded-full bg-primary text-on-primary">
+        <Activity className="size-4" aria-hidden />
       </span>
-      <span className="hidden sm:inline">{text}</span>
-      <span className="sr-only sm:hidden">{text}</span>
+      <span className="hidden leading-tight sm:block">
+        <span className="block text-xs font-medium">{label}</span>
+        <span className="flex items-center gap-1.5 text-[11px] text-muted">
+          <span
+            className={cx(
+              "size-1.5 rounded-full",
+              state === "up" && "bg-emerald-500",
+              state === "down" && "bg-rose-500",
+              state === "checking" && "animate-pulse bg-muted",
+            )}
+          />
+          {status}
+        </span>
+      </span>
+      <span className="sr-only sm:hidden">
+        {label} {status}
+      </span>
     </Link>
   );
 }
@@ -65,7 +69,7 @@ function ThemeSwitcher() {
     <div
       role="radiogroup"
       aria-label="Color theme"
-      className="flex rounded-full border border-slate-200 p-0.5 dark:border-slate-800"
+      className="flex h-12 items-center gap-0.5 rounded-full bg-surface/90 p-1 shadow-card backdrop-blur-xl"
     >
       {THEMES.map(({ mode: m, icon: Icon, label }) => (
         <button
@@ -76,13 +80,11 @@ function ThemeSwitcher() {
           title={`${label} theme`}
           onClick={() => setMode(m)}
           className={cx(
-            "grid size-7 place-items-center rounded-full transition-colors",
-            mode === m
-              ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-              : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+            "grid size-10 place-items-center rounded-full transition",
+            mode === m ? "bg-primary text-on-primary" : "text-muted hover:text-ink",
           )}
         >
-          <Icon className="size-3.5" aria-hidden />
+          <Icon className="size-4" aria-hidden />
           <span className="sr-only">{label}</span>
         </button>
       ))}
@@ -90,8 +92,58 @@ function ThemeSwitcher() {
   );
 }
 
-export function Layout() {
+function NavPills({ className }: { className?: string }) {
   const { entries } = useHistory();
+  return (
+    <nav
+      aria-label="Main"
+      className={cx(
+        "flex h-12 items-center gap-0.5 rounded-full bg-surface/90 p-1 shadow-card backdrop-blur-xl",
+        className,
+      )}
+    >
+      {NAV.map(({ to, label, icon: Icon, end, ...rest }) => (
+        <NavLink
+          key={to}
+          to={to}
+          end={end}
+          className={({ isActive }) =>
+            cx(
+              "inline-flex h-10 flex-1 shrink-0 items-center justify-center gap-2 rounded-full px-3 text-sm transition sm:px-4 lg:flex-none",
+              isActive ? "bg-primary text-on-primary" : "text-muted hover:text-ink",
+            )
+          }
+        >
+          {({ isActive }) => (
+            <>
+              <Icon className="hidden size-4 min-[400px]:block" aria-hidden />
+              {"short" in rest ? (
+                <>
+                  <span className="sm:hidden">{rest.short}</span>
+                  <span className="hidden sm:inline">{label}</span>
+                </>
+              ) : (
+                label
+              )}
+              {to === "/history" && entries.length > 0 && (
+                <span
+                  className={cx(
+                    "grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[10px] font-semibold",
+                    isActive ? "bg-on-primary text-primary" : "bg-primary text-on-primary",
+                  )}
+                >
+                  {entries.length}
+                </span>
+              )}
+            </>
+          )}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+export function Layout() {
   const { pathname } = useLocation();
 
   useEffect(() => {
@@ -99,99 +151,52 @@ export function Layout() {
     window.scrollTo(0, 0);
   }, [pathname]);
 
-  const count = (to: string) =>
-    to === "/history" && entries.length > 0 ? (
-      <span className="ml-1 rounded-full bg-indigo-100 px-1.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">
-        {entries.length}
-      </span>
-    ) : null;
-
   return (
     <div className="flex min-h-dvh flex-col">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:shadow"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-surface focus:px-4 focus:py-2 focus:shadow-card"
       >
         Skip to content
       </a>
 
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
-          <Link to="/" className="flex items-center gap-2 font-semibold">
-            <span className="grid size-8 place-items-center rounded-lg bg-indigo-600 text-white">
-              <Boxes className="size-4.5" aria-hidden />
-            </span>
-            <span>Classifier Studio</span>
-          </Link>
+      <header className="sticky top-0 z-30 bg-canvas/70 backdrop-blur-xl">
+        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <Link to="/" className="mr-2 flex items-center gap-3">
+              <span className="grid size-12 place-items-center rounded-full bg-primary text-on-primary">
+                <svg viewBox="0 0 32 32" className="size-5" aria-hidden>
+                  <path d="M6 6h8v8H6zm0 12h8v8H6zM18 6h8v8h-8zm0 12h5v8h-5z" fill="currentColor" />
+                </svg>
+              </span>
+              <span className="hidden leading-tight min-[420px]:block">
+                <span className="block text-[15px] font-semibold tracking-tight">Classifier</span>
+                <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">Studio</span>
+              </span>
+            </Link>
 
-          <nav aria-label="Main" className="ml-6 hidden items-center gap-1 md:flex">
-            {NAV.map(({ to, label, icon: Icon, ...rest }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={"end" in rest}
-                className={({ isActive }) =>
-                  cx(
-                    "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white",
-                  )
-                }
-              >
-                <Icon className="size-4" aria-hidden />
-                {label}
-                {count(to)}
-              </NavLink>
-            ))}
-          </nav>
+            <NavPills className="hidden lg:flex" />
 
-          <div className="ml-auto flex items-center gap-2">
-            <StatusPill />
-            <ThemeSwitcher />
+            <div className="ml-auto flex items-center gap-2">
+              <StatusPill />
+              <ThemeSwitcher />
+            </div>
           </div>
+
+          {/* Below lg the same top-bar nav wraps onto its own scrollable row. */}
+          <NavPills className="scrollbar-none mt-3 overflow-x-auto lg:hidden" />
         </div>
       </header>
 
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-6 sm:px-6 md:pb-12 md:pt-10">
-        <Outlet />
+      <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 pb-16 pt-6 sm:px-6 lg:pt-10">
+        <ErrorBoundary resetKey={pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
-      <footer className="hidden border-t border-slate-200 py-6 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400 md:block">
-        PyTorch model served by FastAPI on Oracle Cloud · UI on Vercel
+      <footer className="mx-auto w-full max-w-7xl px-4 pb-8 text-[11px] uppercase tracking-[0.12em] text-muted sm:px-6">
+        PyTorch · FastAPI on Oracle Cloud · UI on Vercel
       </footer>
-
-      {/* Mobile: thumb-reachable bottom tab bar */}
-      <nav
-        aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 md:hidden"
-      >
-        <div className="grid grid-cols-4">
-          {NAV.map(({ to, label, icon: Icon, ...rest }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={"end" in rest}
-              className={({ isActive }) =>
-                cx(
-                  "flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium",
-                  isActive
-                    ? "text-indigo-600 dark:text-indigo-400"
-                    : "text-slate-500 dark:text-slate-400",
-                )
-              }
-            >
-              <span className="relative">
-                <Icon className="size-5" aria-hidden />
-                {to === "/history" && entries.length > 0 && (
-                  <span className="absolute -right-2 -top-1 size-2 rounded-full bg-indigo-500" />
-                )}
-              </span>
-              {"shortLabel" in rest ? rest.shortLabel : label}
-            </NavLink>
-          ))}
-        </div>
-      </nav>
     </div>
   );
 }

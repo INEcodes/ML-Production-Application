@@ -1,27 +1,36 @@
 import { useState } from "react";
 import { pct, titleCase } from "../lib/format";
+import { cx } from "./ui";
 
+/** Thin labelled progress lines, styled after the reference's "PROGRESS ——— 70%" rows. */
 export function ProbabilityBars({
   probabilities,
   initial = 5,
+  onContrast,
 }: {
   probabilities: Record<string, number>;
   initial?: number;
+  onContrast?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const sorted = Object.entries(probabilities).sort((a, b) => b[1] - a[1]);
   const shown = expanded ? sorted : sorted.slice(0, initial);
+  const muted = onContrast ? "text-contrast-muted" : "text-muted";
 
   return (
     <div>
-      <ul className="space-y-2.5">
+      <ul className="space-y-4">
         {shown.map(([name, p], i) => (
-          <li key={name} className="grid grid-cols-[7rem_1fr_3.5rem] items-center gap-3 text-sm">
-            <span className={i === 0 ? "truncate font-medium" : "truncate text-slate-600 dark:text-slate-400"}>
-              {titleCase(name)}
-            </span>
+          <li key={name}>
+            <div className="mb-1.5 flex items-baseline justify-between text-[11px] uppercase tracking-[0.08em]">
+              <span className={i === 0 ? "font-semibold" : muted}>{titleCase(name)}</span>
+              <span className={cx("tabular-nums", i === 0 ? "font-semibold" : muted)}>{pct(p)}</span>
+            </div>
             <span
-              className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+              className={cx(
+                "block h-[3px] overflow-hidden rounded-full",
+                onContrast ? "bg-white/15" : "bg-line",
+              )}
               role="meter"
               aria-label={`${titleCase(name)} probability`}
               aria-valuemin={0}
@@ -29,14 +38,18 @@ export function ProbabilityBars({
               aria-valuenow={Math.round(p * 100)}
             >
               <span
-                className={`block h-full rounded-full transition-[width] duration-500 ${
-                  i === 0 ? "bg-indigo-600 dark:bg-indigo-400" : "bg-indigo-300 dark:bg-indigo-700"
-                }`}
-                style={{ width: `${Math.max(p * 100, 0.5)}%` }}
+                className={cx(
+                  "block h-full rounded-full transition-[width] duration-700",
+                  onContrast
+                    ? i === 0
+                      ? "bg-on-contrast"
+                      : "bg-on-contrast/45"
+                    : i === 0
+                      ? "bg-primary"
+                      : "bg-primary/40",
+                )}
+                style={{ width: `${Math.max(p * 100, 0.75)}%` }}
               />
-            </span>
-            <span className="text-right tabular-nums text-slate-600 dark:text-slate-400">
-              {pct(p)}
             </span>
           </li>
         ))}
@@ -45,7 +58,10 @@ export function ProbabilityBars({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-3 text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+          className={cx(
+            "mt-5 text-xs font-medium underline-offset-4 hover:underline",
+            onContrast ? "text-on-contrast" : "text-ink",
+          )}
         >
           {expanded ? "Show top results only" : `Show all ${sorted.length} classes`}
         </button>
