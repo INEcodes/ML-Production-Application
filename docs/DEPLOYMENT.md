@@ -53,7 +53,8 @@ won't load, and the container will say so in its logs.
 ```bash
 scp -r scripts/vm serving/.env.example ubuntu@<vm-ip>:~/
 ssh ubuntu@<vm-ip>
-sudo DOMAIN=api.example.com EMAIL=you@example.com bash ~/vm/setup.sh
+openssl rand -hex 32                            # PROXY_KEY - also goes into Vercel (5b)
+sudo DOMAIN=api.example.com EMAIL=you@example.com PROXY_KEY=<key> bash ~/vm/setup.sh
 exit                                            # log back in so the docker group applies
 ssh ubuntu@<vm-ip>
 cp ~/.env.example /opt/ml-app/.env && chmod 600 /opt/ml-app/.env && nano /opt/ml-app/.env
@@ -65,7 +66,14 @@ it pulls certbot from EPEL and removes the preinstalled podman/buildah/runc, whi
 conflict with Docker. It opens 80/443 on the host, separately from the Security List:
 iptables on Ubuntu, firewalld on Oracle Linux. On Oracle Linux it also allows nginx
 to proxy through SELinux. It also installs the `ml-app` systemd unit and the nginx site, and gets a
-TLS certificate if `DOMAIN` and `EMAIL` are set. It is safe to re-run.
+TLS certificate if `DOMAIN` and `EMAIL` are set. It is safe to re-run, but it rewrites
+the nginx site, so always pass the same `DOMAIN`, `EMAIL` and `PROXY_KEY` again (certbot
+then re-adds the HTTPS block from the existing certificate).
+
+With `PROXY_KEY` set, nginx answers `/cnn/*` and `/rnn/*` only when the request carries
+`X-Proxy-Key: <key>`. Only the Vercel function sends that header, so the API (including
+`/docs`) can't be called directly. Docker's healthchecks and `deploy.sh` talk to the
+containers on `127.0.0.1` and aren't affected. Without `PROXY_KEY` the gate is off.
 
 In `/opt/ml-app/.env`, set `IMAGE`, the `OCI_*` values and `COMPOSE_PROFILES`. **Only list
 models that already have a pushed version**, e.g. `COMPOSE_PROFILES=cnn`. A service with
@@ -109,15 +117,19 @@ To deploy by hand from your laptop (Git Bash/WSL):
 ## 5. Verify
 
 ```bash
-curl https://<domain>/cnn/health          # {"status":"ok","model_name":"cnn","model_version":1}
-curl https://<domain>/cnn/version         # model version, git commit, test metrics, image tag
-curl -X POST https://<domain>/cnn/predict -H 'Content-Type: application/json' \
+K='X-Proxy-Key: <key>'                       # omit if PROXY_KEY isn't set
+curl https://<domain>/cnn/health -H "$K"   # {"status":"ok","model_name":"cnn","model_version":1}
+curl https://<domain>/cnn/health           # 403 {"detail": "use the web app"} - gate works
+curl https://<domain>/cnn/version -H "$K"  # model version, git commit, test metrics, image tag
+curl -X POST https://<domain>/cnn/predict -H "$K" -H 'Content-Type: application/json' \
   -d "{\"image_base64\": \"$(base64 -w0 cat.png)\"}"
-curl -X POST https://<domain>/rnn/predict -H 'Content-Type: application/json' \
+curl -X POST https://<domain>/rnn/predict -H "$K" -H 'Content-Type: application/json' \
   -d '{"text": "Stocks rallied after the central bank held rates."}'
 ```
 
-Interactive docs: `https://<domain>/cnn/docs`.
+Interactive docs: `https://<domain>/cnn/docs` (a browser can't send the header, so with
+`PROXY_KEY` set use an SSH tunnel instead: `ssh -L 8001:127.0.0.1:8001 <vm>`, then
+`http://localhost:8001/docs`).
 
 ## 5b. Frontend on Vercel (separate from the VM)
 
@@ -129,21 +141,28 @@ is built from `serving/` only. Vercel deploys it from the same GitHub repo:
 2. **Root Directory:** `frontend`. **Framework Preset:** Vite. Leave the build and output
    settings on their defaults: `frontend/vercel.json` sets `npm run build` → `dist/` and
    the SPA fallback that serves `index.html` for `/history`, `/model` and `/about`.
-3. **Environment Variables:** `API_BASE_URL` = `https://<domain>/cnn`. Apply it to
-   Production and Preview.
+3. **Environment Variables** (Production and Preview):
+   - `API_BASE_URL` = `https://<domain>/cnn`
+   - `PROXY_KEY` = the key passed to `setup.sh` (mark it **Sensitive**)
+   - `ALLOWED_ORIGINS` *(optional)*: comma-separated browser origins the function
+     accepts. It defaults to `https://ml-production-application-frontend.vercel.app`,
+     so preview deployments get `403 origin not allowed` on `/api/predict` unless you
+     add their URLs here.
 4. Click **Deploy**. Afterwards every push redeploys it. To skip Vercel builds for
    backend-only commits, set Settings → Git → **Ignored Build Step** to
    `git diff HEAD^ HEAD --quiet -- .`
 
 The browser only calls the page's own `/api/{health,version,predict}`. The function in
 `frontend/api/[endpoint].js` forwards those calls to `API_BASE_URL`, so the backend needs
-no CORS setup. Changing the backend URL means editing the Vercel env var and redeploying.
+no CORS setup. The function refuses browser requests whose `Origin` isn't in
+`ALLOWED_ORIGINS`, and it adds `X-Proxy-Key` so nginx lets the request through. Changing
+the backend URL or key means editing the Vercel env var and redeploying.
 
 Local development (Node 20.19+):
 
 ```bash
 cd frontend
-cp .env.example .env        # API_BASE_URL=https://<domain>/cnn
+cp .env.example .env        # API_BASE_URL=https://<domain>/cnn, PROXY_KEY=<key>
 npm install
 npm run dev                 # http://localhost:5173; Vite proxies /api/* like the Vercel function
 npm run build               # typecheck + production build (what Vercel runs)

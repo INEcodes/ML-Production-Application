@@ -6,7 +6,8 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 // `npm run dev` mimics that function so no Vercel CLI is needed: /api/{health,version,
 // predict} are proxied to API_BASE_URL (from frontend/.env) and /api/config is answered here.
 export default defineConfig(({ mode }) => {
-  const backend = (loadEnv(mode, process.cwd(), "").API_BASE_URL || "").replace(/\/+$/, "");
+  const env = loadEnv(mode, process.cwd(), "");
+  const backend = (env.API_BASE_URL || "").replace(/\/+$/, "");
 
   const devConfigEndpoint: Plugin = {
     name: "dev-api-config",
@@ -34,6 +35,7 @@ export default defineConfig(({ mode }) => {
             "^/api/(health|version|predict)$": {
               target: backend,
               changeOrigin: true,
+              headers: { "X-Proxy-Key": env.PROXY_KEY || "" },
               // the target's own path (e.g. /cnn) is prepended by the proxy
               rewrite: (path) => path.replace(/^\/api/, ""),
             },

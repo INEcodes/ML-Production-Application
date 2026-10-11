@@ -26,6 +26,21 @@ DEPLOY_USER="${DEPLOY_USER:-${SUDO_USER:-$([ "$OS" = ubuntu ] && echo ubuntu || 
 APP_DIR="${APP_DIR:-/opt/ml-app}"
 DOMAIN="${DOMAIN:-}"
 EMAIL="${EMAIL:-}"
+# Shared secret with the Vercel proxy (its PROXY_KEY env var); nginx rejects /cnn/ and
+# /rnn/ requests without it. Generate with: openssl rand -hex 32
+PROXY_KEY="${PROXY_KEY:-}"
+if [ -n "$PROXY_KEY" ] && ! [[ "$PROXY_KEY" =~ ^[A-Za-z0-9_-]{32,}$ ]]; then
+  echo "PROXY_KEY must be 32+ chars of [A-Za-z0-9_-] (e.g. openssl rand -hex 32)" >&2
+  exit 1
+fi
+
+render_site() {
+  local default=1
+  [ -n "$PROXY_KEY" ] && default=0
+  sed -e "s|__DOMAIN__|${DOMAIN:-_}|g" -e "s|__PROXY_KEY_DEFAULT__|$default|" \
+    -e "s|__PROXY_KEY__|$PROXY_KEY|" "$HERE/nginx-ml-app.conf" > "$1"
+  chmod 640 "$1"
+}
 
 # E2.1.Micro has 1 GB RAM: one serving container (~250-300 MB with torch) fits, but
 # image pulls and a second model can spike past it. Swap turns an OOM kill into slowness.
@@ -79,7 +94,7 @@ https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable" \
   netfilter-persistent save
 
   NGINX_SITE=/etc/nginx/sites-available/ml-app
-  sed "s|__DOMAIN__|${DOMAIN:-_}|g" "$HERE/nginx-ml-app.conf" > "$NGINX_SITE"
+  render_site "$NGINX_SITE"
   ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/ml-app
   rm -f /etc/nginx/sites-enabled/default
 }
@@ -125,7 +140,7 @@ install_el() {
   fi
 
   NGINX_SITE=/etc/nginx/conf.d/ml-app.conf
-  sed "s|__DOMAIN__|${DOMAIN:-_}|g" "$HERE/nginx-ml-app.conf" > "$NGINX_SITE"
+  render_site "$NGINX_SITE"
   # The stock nginx.conf has its own `default_server` welcome page on :80. conf.d is
   # included before it, so dropping that flag makes this site answer requests by IP.
   sed -i 's/ default_server//' /etc/nginx/nginx.conf
